@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>تتبع حافلة بني عطلي</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+    <script type="module" src="model-viewer.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+        html, body { width: 100%; height: 100%; background: #0f1318; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        /* ---- MAP STAGE ---- */
+        .map-stage { position: absolute; inset: 0; background: #c8cfc5; }
+        #map { position: absolute; inset: 0; width: 100%; height: 100%; background: #c8cfc5; }
+        .leaflet-tile-pane { filter: contrast(1.02) brightness(0.99); }
+        .custom-bus-div-icon { background: transparent !important; border: none !important; overflow: visible !important; }
+        .bus-marker-container { position: relative; width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; pointer-events: auto; cursor: pointer; }
+        .bus-shadow-ao { position: absolute; bottom: 10px; left: 50%; width: 32px; height: 12px; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(ellipse at center, rgba(8,10,14,0.75) 0%, rgba(8,10,14,0.35) 50%, rgba(8,10,14,0) 78%); filter: blur(1.2px); z-index: 1; pointer-events: none; }
+        .bus-shadow-penumbra { position: absolute; bottom: 8px; left: 50%; width: 40px; height: 15px; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(ellipse at center, rgba(14,18,25,0.35) 0%, rgba(14,18,25,0.12) 55%, rgba(14,18,25,0) 80%); filter: blur(2.5px); z-index: 1; pointer-events: none; }
+        .bus-heading-beam { display: none; }
+        .bus-model { position: relative; z-index: 3; width: 50px; height: 50px; --poster-color: transparent; --progress-bar-color: transparent; --progress-mask: transparent; background: transparent; pointer-events: none; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35)); }
+        .bus-number-badge { position: absolute; top: -7px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #e31320 0%, #b80d17 100%); color: #fff; font-size: 9.5px; font-weight: 700; padding: 1.5px 6px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.92); box-shadow: 0 2px 6px rgba(0,0,0,0.35); z-index: 10; white-space: nowrap; pointer-events: none; display: flex; align-items: center; gap: 3.5px; }
+        .bus-number-badge .sdot { width: 5px; height: 5px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 5px #4ade80; animation: pdot 2s infinite ease-in-out; }
+        .bus-number-badge.offline .sdot { background: #9ca3af; box-shadow: none; animation: none; }
+        @keyframes pdot { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.35);opacity:0.7} }
+        .map-style-toggle { position: absolute; top: 14px; left: 14px; z-index: 1000; background: rgba(18,22,29,0.88); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.14); border-radius: 20px; padding: 4px; display: flex; gap: 4px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
+        .map-style-btn { background: transparent; border: none; padding: 7px 11px; border-radius: 15px; cursor: pointer; font-size: 11px; font-weight: 700; color: #d1d5db; transition: all 0.22s ease; font-family: inherit; }
+        .map-style-btn:hover { color: #fff; background: rgba(255,255,255,0.08); }
+        .map-style-btn.active { background: #e31320; color: #fff; box-shadow: 0 3px 12px rgba(227,19,32,0.45); }
+        .map-style-btn.mode-3d { min-width: 44px; background: rgba(255,255,255,0.08); color: #fff; font-weight: 800; }
+        .map-style-btn.mode-3d.active { background: #fff; color: #d90b18; }
+        .map-fab { position: absolute; bottom: 24px; left: 16px; z-index: 1000; }
+        .fab-btn { width: 44px; height: 44px; border-radius: 50%; background: rgba(18,22,29,0.90); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,0.16); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(0,0,0,0.4); cursor: pointer; transition: all 0.25s ease; }
+        .fab-btn:active { transform: scale(0.92); background: #e31320; }
+        .fab-btn svg { width: 22px; height: 22px; fill: currentColor; }
+        .stn-pin { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 14px; font-size: 11px; font-weight: 700; color: #fff; border: 1.5px solid rgba(255,255,255,0.9); box-shadow: 0 4px 14px rgba(0,0,0,0.35); white-space: nowrap; backdrop-filter: blur(4px); }
+        .stn-dot { width: 6px; height: 6px; border-radius: 50%; background: #fff; box-shadow: 0 0 5px rgba(255,255,255,0.8); }
+        .leaflet-popup-content-wrapper { direction: rtl; text-align: right; border-radius: 18px; background: rgba(18,22,29,0.94); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); color: #fff; box-shadow: 0 16px 40px rgba(0,0,0,0.55); font-family: inherit; padding: 8px 10px; border: 1px solid rgba(255,255,255,0.14); }
+        .leaflet-popup-tip { background: rgba(18,22,29,0.94); }
+        .pc h3 { margin: 0 0 8px 0; color: #ff525d; font-size: 15px; font-weight: 800; display: flex; align-items: center; gap: 6px; }
+        .pc p { margin: 4px 0; font-size: 12.5px; color: #e5e7eb; line-height: 1.5; }
+        .pbadge { display: inline-block; margin-top: 8px; padding: 4px 10px; border-radius: 12px; background: rgba(227,19,32,0.18); border: 1px solid rgba(227,19,32,0.35); color: #ff858d; font-size: 11px; font-weight: 700; }
+        /* Position zoom controls below native top-right GPS button with zero overlap */
+        .leaflet-top.leaflet-right {
+            top: 76px !important;
+            right: 14px !important;
+        }
+        .leaflet-control-zoom {
+            border: 1px solid rgba(255,255,255,0.18) !important;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.35) !important;
+            border-radius: 14px !important;
+            overflow: hidden !important;
+            background: rgba(18,22,29,0.88) !important;
+            backdrop-filter: blur(14px) !important;
+            -webkit-backdrop-filter: blur(14px) !important;
+        }
+        .leaflet-control-zoom a {
+            background-color: transparent !important;
+            color: #fff !important;
+            border-bottom: 1px solid rgba(255,255,255,0.12) !important;
+            width: 38px !important;
+            height: 38px !important;
+            line-height: 38px !important;
+            font-size: 18px !important;
+        }
+        .leaflet-control-zoom a:hover {
+            background-color: rgba(255,255,255,0.1) !important;
+            color: #fff !important;
+        }
+        .map-fab { display: none !important; }
+    </style>
+</head>
+<body>
+    <div id="map-stage" class="map-stage"><div id="map"></div></div>
+    <div class="map-style-toggle">
+        <button id="btnRoadmap" class="map-style-btn active" onclick="switchLayer('roadmap')">طرق</button>
+        <button id="btnHybrid" class="map-style-btn" onclick="switchLayer('hybrid')">قمر</button>
+    </div>
+    <div class="map-fab">
+        <button class="fab-btn" onclick="centerOnBus()" title="التركيز على الحافلة">
+            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+        </button>
+    </div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script>
+    // ===========================================================
+    // GLB AXIS NOTE:
+    // bus.glb node has rotation [0.707,0,0,0.707] = 90° around X.
+    // After that rotation in model-viewer, the bus nose faces +Z.
+    // camera-orbit theta=0   → camera at +Z → sees REAR of bus
+    // camera-orbit theta=180 → camera at -Z → sees FRONT of bus
+    // headingToTheta(h) = (180+h)%360 so at heading=0(North)
+    // the viewer is behind (South) the bus looking North. Correct.
+    // MODEL_HEADING_OFFSET = 0 for standard glTF front-axis.
+    // ===========================================================
+    const MODEL_HEADING_OFFSET = 0;
+    window.ModelViewerElement = window.ModelViewerElement || {};
+    window.ModelViewerElement.meshoptDecoderLocation = 'meshopt_decoder.js';
+
+    // ===========================================================
+    // ROUTE POLYLINE — 265 pts from OSRM (El Forkane → El Hanout)
+    // ===========================================================
+    const RC = [[36.264331,2.75892],[36.264033,2.758821],[36.263788,2.758761],[36.26378,2.758724],[36.263762,2.758692],[36.263736,2.75867],[36.26372,2.758663],[36.263689,2.75866],[36.263658,2.758671],[36.263644,2.758684],[36.263633,2.758694],[36.263612,2.758741],[36.263608,2.75878],[36.263616,2.758817],[36.263634,2.75885],[36.263664,2.758875],[36.263694,2.758884],[36.263725,2.758879],[36.263753,2.758861],[36.264052,2.758878],[36.264247,2.758927],[36.264335,2.75895],[36.264365,2.758943],[36.264431,2.758963],[36.264966,2.759092],[36.265369,2.759194],[36.265695,2.759306],[36.265745,2.759342],[36.265958,2.759492],[36.265991,2.75952],[36.266419,2.759876],[36.266588,2.760014],[36.266635,2.760052],[36.266707,2.760111],[36.266819,2.760203],[36.267098,2.760377],[36.267232,2.760461],[36.267986,2.760974],[36.26831,2.761151],[36.268429,2.761231],[36.269211,2.761781],[36.269243,2.761804],[36.269816,2.762166],[36.270125,2.762362],[36.270171,2.762391],[36.270211,2.762417],[36.270969,2.762916],[36.271083,2.762991],[36.271443,2.763228],[36.27162,2.763406],[36.271694,2.76348],[36.271749,2.763555],[36.271929,2.763796],[36.272005,2.763898],[36.272374,2.76449],[36.272564,2.764786],[36.272711,2.76501],[36.272874,2.765273],[36.272978,2.765427],[36.273232,2.765845],[36.273374,2.765999],[36.273584,2.766167],[36.273741,2.766247],[36.273829,2.766274],[36.273945,2.76631],[36.274147,2.76636],[36.274429,2.766467],[36.27458,2.766525],[36.274647,2.766563],[36.274695,2.766599],[36.274735,2.766637],[36.274746,2.766661],[36.27482,2.766661],[36.274877,2.766645],[36.274898,2.766628],[36.27495,2.766594],[36.274993,2.766508],[36.274993,2.766411],[36.275006,2.766318],[36.275028,2.766221],[36.275065,2.766153],[36.275081,2.766135],[36.275098,2.766114],[36.27524,2.765948],[36.275435,2.765798],[36.275703,2.76564],[36.275908,2.765548],[36.276112,2.765479],[36.276305,2.765408],[36.276488,2.765295],[36.276786,2.765052],[36.276911,2.764987],[36.27703,2.76495],[36.277158,2.764944],[36.27743,2.764953],[36.277556,2.764923],[36.277657,2.764861],[36.27782,2.764749],[36.278111,2.764539],[36.278347,2.764352],[36.278613,2.7641],[36.2788,2.763916],[36.278989,2.76378],[36.279206,2.763673],[36.279348,2.76363],[36.279539,2.763636],[36.279705,2.763692],[36.279793,2.763725],[36.279969,2.763791],[36.279999,2.7638],[36.280232,2.763846],[36.280521,2.763894],[36.280778,2.763924],[36.28116,2.763947],[36.281376,2.763898],[36.281528,2.763823],[36.281681,2.763719],[36.281798,2.763587],[36.281843,2.763525],[36.281941,2.763389],[36.282105,2.763121],[36.282306,2.762748],[36.28232,2.762721],[36.282442,2.762493],[36.282542,2.762359],[36.282652,2.762254],[36.282881,2.76201],[36.282992,2.761863],[36.283059,2.76172],[36.283152,2.76145],[36.283329,2.760814],[36.283497,2.760251],[36.283522,2.760188],[36.283558,2.760095],[36.283634,2.759937],[36.28374,2.759752],[36.283878,2.75954],[36.284194,2.759084],[36.28449,2.758673],[36.284594,2.758558],[36.284782,2.758424],[36.285126,2.758193],[36.285283,2.758049],[36.285441,2.75785],[36.285612,2.757558],[36.285761,2.757247],[36.28585,2.757011],[36.285891,2.756785],[36.285919,2.756517],[36.285919,2.756481],[36.285917,2.756197],[36.285913,2.755881],[36.285921,2.755667],[36.285954,2.755412],[36.285999,2.755184],[36.286023,2.754983],[36.286049,2.754817],[36.286101,2.754637],[36.286159,2.754471],[36.286217,2.754342],[36.286291,2.754206],[36.286399,2.754052],[36.286507,2.753913],[36.28667,2.753734],[36.286953,2.75352],[36.287085,2.75341],[36.287206,2.753265],[36.28731,2.753077],[36.287457,2.752734],[36.287722,2.752152],[36.287873,2.751826],[36.287919,2.751724],[36.28801,2.751521],[36.288222,2.751036],[36.288457,2.750466],[36.288613,2.750136],[36.288706,2.75001],[36.288784,2.749948],[36.288842,2.749911],[36.288853,2.749904],[36.288907,2.74981],[36.28918,2.749607],[36.289687,2.749207],[36.289876,2.74904],[36.290037,2.748826],[36.290233,2.748473],[36.290383,2.748046],[36.290504,2.747575],[36.290639,2.747081],[36.290751,2.746757],[36.290893,2.746469],[36.291085,2.746178],[36.291972,2.745031],[36.29271,2.744077],[36.293338,2.743279],[36.293389,2.74322],[36.29344,2.743162],[36.293493,2.743105],[36.293546,2.743049],[36.293599,2.742995],[36.293611,2.742992],[36.293644,2.742978],[36.293673,2.742953],[36.293695,2.742919],[36.293709,2.742878],[36.293713,2.742835],[36.293708,2.742792],[36.293715,2.742674],[36.293728,2.742558],[36.293748,2.742442],[36.293774,2.742329],[36.293805,2.742217],[36.293888,2.742121],[36.293966,2.742035],[36.294046,2.741952],[36.294127,2.741872],[36.294211,2.741794],[36.294741,2.741251],[36.294842,2.741148],[36.294904,2.741096],[36.294967,2.741048],[36.295033,2.741004],[36.2951,2.740964],[36.295169,2.740928],[36.295185,2.740927],[36.295219,2.740916],[36.295249,2.740894],[36.295262,2.740877],[36.295273,2.740863],[36.29529,2.740825],[36.295299,2.740783],[36.295318,2.740718],[36.295338,2.740654],[36.29536,2.74059],[36.295383,2.740528],[36.295403,2.740479],[36.295926,2.739513],[36.296037,2.739313],[36.296146,2.739111],[36.296252,2.738906],[36.296356,2.7387],[36.296627,2.738117],[36.29721,2.736951],[36.297666,2.736026],[36.297785,2.735813],[36.297856,2.735686],[36.297927,2.73559],[36.2981,2.735359],[36.298622,2.734676],[36.299415,2.733638],[36.299489,2.733543],[36.299523,2.733499],[36.29986,2.733066],[36.300327,2.732504],[36.300424,2.732388],[36.300916,2.731867],[36.300976,2.731803],[36.302018,2.730698],[36.302684,2.730021],[36.302863,2.729904],[36.303192,2.729822],[36.303698,2.729753],[36.303889,2.729686],[36.304226,2.729541],[36.304551,2.729339]];
+
+    // ===========================================================
+    // PRECOMPUTED SEGMENTS
+    // ===========================================================
+    const segs = [];
+    let totalDist = 0;
+    (function(){
+        for(let i=0;i<RC.length-1;i++){
+            const p1=RC[i], p2=RC[i+1];
+            const d=hav(p1[0],p1[1],p2[0],p2[1]);
+            const b=brng(p1[0],p1[1],p2[0],p2[1]);
+            segs.push({i,p1,p2,len:d,s0:totalDist,s1:totalDist+d,b});
+            totalDist+=d;
+        }
+    })();
+
+    // ===========================================================
+    // MATH
+    // ===========================================================
+    function hav(a,b,c,d){
+        const R=6371000,ra=a*Math.PI/180,rc=c*Math.PI/180,dr=(c-a)*Math.PI/180,dl=(d-b)*Math.PI/180;
+        const x=Math.sin(dr/2)**2+Math.cos(ra)*Math.cos(rc)*Math.sin(dl/2)**2;
+        return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+    }
+    function brng(a,b,c,d){
+        const ra=a*Math.PI/180,rc=c*Math.PI/180,dl=(d-b)*Math.PI/180;
+        const y=Math.sin(dl)*Math.cos(rc),x=Math.cos(ra)*Math.sin(rc)-Math.sin(ra)*Math.cos(rc)*Math.cos(dl);
+        return(Math.atan2(y,x)*180/Math.PI+360)%360;
+    }
+    function sdelta(f,t){let d=(t-f)%360;if(d<-180)d+=360;if(d>180)d-=360;return d;}
+    function bisect(d){
+        let lo=0,hi=segs.length-1;
+        while(lo<hi){const m=(lo+hi)>>1;if(segs[m].s1<d)lo=m+1;else hi=m;}
+        return lo;
+    }
+
+    // ===========================================================
+    // MAP MATCHING WITH ROUTE CONTINUITY
+    // ===========================================================
+    function proj(lat,lng,seg){
+        const cl=Math.cos(seg.p1[0]*Math.PI/180);
+        const dx=(seg.p2[1]-seg.p1[1])*cl,dy=seg.p2[0]-seg.p1[0];
+        const lq=dx*dx+dy*dy;
+        let t=0;
+        if(lq>0){const gx=(lng-seg.p1[1])*cl,gy=lat-seg.p1[0];t=Math.max(0,Math.min(1,(gx*dx+gy*dy)/lq));}
+        const pl=seg.p1[0]+t*(seg.p2[0]-seg.p1[0]),pn=seg.p1[1]+t*(seg.p2[1]-seg.p1[1]);
+        return{lat:pl,lng:pn,t,pd:hav(lat,lng,pl,pn),rd:seg.s0+t*seg.len,si:seg.i,b:seg.b};
+    }
+    function mapMatch(lat,lng,lastD,dir){
+        let lo=0,hi=segs.length-1;
+        if(lastD!==null&&lastD>=0){
+            const ci=bisect(lastD);
+            if(dir>=0){lo=Math.max(0,ci-4);hi=Math.min(hi,ci+18);}
+            else{lo=Math.max(0,ci-18);hi=Math.min(hi,ci+4);}
+        }
+        let best=null;
+        for(let i=lo;i<=hi;i++){
+            const p=proj(lat,lng,segs[i]);
+            p.sc=p.pd+(lastD!==null&&lastD>=0?Math.abs(p.rd-lastD)*0.10:0);
+            if(!best||p.sc<best.sc)best=p;
+        }
+        if(!best||best.pd>50){
+            for(let i=0;i<segs.length;i++){
+                const p=proj(lat,lng,segs[i]);p.sc=p.pd;
+                if(!best||p.pd<best.pd)best=p;
+            }
+        }
+        return best;
+    }
+
+    // ===========================================================
+    // ROAD POINT AT CUMULATIVE DISTANCE
+    // Multi-segment curve look-ahead for smooth, natural turns
+    // ===========================================================
+    function rdAt(dist){
+        const d=Math.max(0,Math.min(totalDist,dist));
+        const i=bisect(d);
+        const sg=segs[i];
+        const t=sg.len>0?(d-sg.s0)/sg.len:0;
+        const lat=sg.p1[0]+t*(sg.p2[0]-sg.p1[0]);
+        const lng=sg.p1[1]+t*(sg.p2[1]-sg.p1[1]);
+        // Early multi-segment curve look-ahead (starts at t=0.25)
+        let b=sg.b;
+        if(i<segs.length-1){
+            if(t>0.25){
+                const bl=Math.min(1,(t-0.25)/0.75);
+                // Blend into next segment bearing
+                b=(sg.b+sdelta(sg.b,segs[i+1].b)*bl*0.55+360)%360;
+                // Second-level look-ahead for S-curves and compound turns
+                if(i<segs.length-2 && bl>0.55){
+                    const bl2=(bl-0.55)/0.45;
+                    b=(b+sdelta(b,segs[i+2].b)*bl2*0.2+360)%360;
+                }
+            }
+        }
+        return{lat,lng,b};
+    }
+
+    // ===========================================================
+    // STATE
+    // ===========================================================
+    let map;
+    const buses={};
+    let pending={};
+    let firstLoad=true;
+    let gRL,gHL;
+    let is3D=false;
+
+    function headingToTheta(h){return(180+(h||0))%360;}
+
+    // ===========================================================
+    // SCALE
+    // ===========================================================
+    function updScale(){
+        if(!map)return;
+        const z=map.getZoom();
+        const s=Math.max(0.60,Math.min(1.25,Math.pow(1.10,z-16)));
+        document.querySelectorAll('.bus-marker-container').forEach(el=>{
+            el.style.transform='scale('+s+')';
+        });
+    }
+
+    // ===========================================================
+    // MAP INIT
+    // ===========================================================
+    function initMap(){
+        map=L.map('map',{zoomControl:false,attributionControl:false,fadeAnimation:true,zoomAnimation:true}).setView([36.287951,2.751746],14);
+        L.control.zoom({position:'topright'}).addTo(map);
+        gRL=L.tileLayer('https://mt1.google.com/vt/lyrs=m&hl=ar&x={x}&y={y}&z={z}',{maxZoom:20,subdomains:['mt0','mt1','mt2','mt3']}).addTo(map);
+        gHL=L.tileLayer('https://mt1.google.com/vt/lyrs=y&hl=ar&x={x}&y={y}&z={z}',{maxZoom:20,subdomains:['mt0','mt1','mt2','mt3']});
+        // Route corridor
+        L.polyline(RC,{color:'#e31320',weight:8,opacity:0.15,lineCap:'round',lineJoin:'round'}).addTo(map);
+        L.polyline(RC,{color:'#e31320',weight:3.5,opacity:0.72,lineCap:'round',lineJoin:'round',dashArray:'8,8'}).addTo(map);
+        map.on('zoom',updScale);map.on('zoomend',updScale);
+        initStations();
+        for(const id in pending){const u=pending[id];updateBus(u.id,u.busName,u.lat,u.lng,u.speed,u.course,u.formattedTime,u.isOnline);}
+        pending={};
+    }
+
+    function initStations(){
+        const stns=[
+            {name:"مسجد الفرقان",pos:[36.264338,2.758888],color:"#00897B"},
+            {name:"محطة بلحضري",pos:[36.273830,2.766270],color:"#7CB342"},
+            {name:"محطة الشراشرية",pos:[36.287951,2.751746],color:"#F4511E"},
+            {name:"محطة بني عطلي",pos:[36.295291,2.740911],color:"#1E88E5"},
+            {name:"محطة الدهمي",pos:[36.297794,2.735820],color:"#2E7D32"},
+            {name:"محطة بوعامر",pos:[36.300976,2.731803],color:"#8E24AA"},
+            {name:"محطة الحانوت",pos:[36.304553,2.729345],color:"#D81B60"}
+        ];
+        stns.forEach(st=>{
+            const icon=L.divIcon({className:'',html:'<div class="stn-pin" style="background:'+st.color+'e6;"><div class="stn-dot"></div><span>'+st.name+'</span></div>',iconSize:[115,28],iconAnchor:[57,14]});
+            L.marker(st.pos,{icon}).addTo(map).bindPopup('<div class="pc"><h3 style="color:'+st.color+';">'+st.name+'</h3><p><b>الإحداثيات:</b> '+st.pos[0].toFixed(6)+', '+st.pos[1].toFixed(6)+'</p><span class="pbadge">نقطة مسار رسمية</span></div>');
+        });
+    }
+
+    function switchLayer(t){
+        [gRL,gHL].forEach(l=>{if(map.hasLayer(l))map.removeLayer(l);});
+        ({roadmap:gRL,hybrid:gHL})[t].addTo(map);
+        ['Roadmap','Hybrid'].forEach(n=>{
+            const b=document.getElementById('btn'+n);
+            if(b) b.classList.toggle('active',t===n.toLowerCase());
+        });
+    }
+
+    function toggle3D(){}
+
+    // ===========================================================
+    // CREATE BUS MARKER
+    // ===========================================================
+    function createBusMarker(id,busName,lat,lng,heading,speed,time,isOnline,rd){
+        const eff=(heading+MODEL_HEADING_OFFSET+360)%360;
+        const theta=headingToTheta(eff);
+        const phi=is3D?'58deg':'38deg';
+        const html='<div class="bus-marker-container" id="mc-'+id+'">'
+            +'<div class="bus-shadow-penumbra"></div>'
+            +'<div class="bus-shadow-ao"></div>'
+            +'<div class="bus-heading-beam" id="bm-'+id+'" style="transform:rotate('+eff+'deg);"></div>'
+            +'<div class="bus-number-badge '+(isOnline?'':'offline')+'" id="bg-'+id+'">'
+            +'<span class="sdot"></span><span>'+busName+'</span></div>'
+            +'<model-viewer class="bus-model" id="mv-'+id+'" src="bus_small.glb" alt="'+busName+'"'
+            +' camera-orbit="'+theta+'deg '+phi+' 102%" camera-target="auto auto auto"'
+            +' field-of-view="24deg" interaction-prompt="none"'
+            +' disable-zoom disable-pan disable-tap'
+            +' shadow-intensity="1.2" shadow-softness="0.75"'
+            +' exposure="1.05" tone-mapping="aces"'
+            +' environment-image="neutral" loading="eager" reveal="auto">'
+            +'</model-viewer></div>';
+        const icon=L.divIcon({className:'custom-bus-div-icon',html,iconSize:[52,52],iconAnchor:[26,32]});
+        const marker=L.marker([lat,lng],{icon,zIndexOffset:1000}).addTo(map);
+        bndPop(marker,busName,speed,eff,time,isOnline);
+        buses[id]={marker,curLL:[lat,lng],curRD:rd,tgtRD:rd,dir:1,curH:eff,tgtH:eff,curTheta:theta,spd:speed||0,spdMps:(speed||0)/3.6,name:busName,isOnline};
+        updScale();
+    }
+
+    function bndPop(marker,busName,speed,heading,time,isOnline){
+        const sc=isOnline?'#4ade80':'#9ca3af';
+        marker.bindPopup('<div class="pc"><h3><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+sc+';"></span>'+busName+'</h3>'
+            +'<p><b>السرعة:</b> '+Number(speed||0).toFixed(1)+' كم/س</p>'
+            +'<p><b>اتجاه الطريق:</b> '+Number(heading||0).toFixed(0)+'°</p>'
+            +'<p><b>الحالة:</b> <span style="color:'+sc+';font-weight:700;">'+(isOnline?'متصل (مباشر)':'غير متصل')+'</span></p>'
+            +'<p><b>آخر تحديث:</b> '+(time||'الآن')+'</p>'
+            +'<span class="pbadge">خط بني عطلي • محاكاة دقيقة على الطريق</span></div>');
+    }
+
+    // ===========================================================
+    // CONTINUOUS TICK ANIMATION SYSTEM
+    // Professional navigation-grade simulation (Google Maps/Uber)
+    //
+    // Instead of animating per-GPS-update, a single rAF loop runs
+    // continuously. Between GPS fixes the bus is extrapolated
+    // forward along the route using its last known speed. Position
+    // and heading are exponentially smoothed every frame for
+    // butter-smooth, jitter-free motion.
+    // ===========================================================
+    const TK_POS  = 5.0;   // position smoothing rate (higher = snappier)
+    const TK_HDG  = 4.5;   // heading smoothing rate
+    const TK_XGAIN= 0.90;  // extrapolation gain (<1 prevents overshoot)
+    const TK_STOP = 0.35;  // m/s below which bus is considered stopped
+
+    function mainLoop(now){
+        const dt=Math.min((now-(mainLoop._p||now))/1000, 0.20);
+        mainLoop._p=now;
+        for(const id in buses) tickBus(id,buses[id],dt);
+        requestAnimationFrame(mainLoop);
+    }
+
+    function tickBus(id,bo,dt){
+        if(dt<=0) return;
+        const moving=bo.spdMps>TK_STOP;
+
+        // 1. Speed-based route extrapolation between GPS fixes
+        if(moving){
+            bo.tgtRD+=bo.spdMps*dt*bo.dir*TK_XGAIN;
+            bo.tgtRD=Math.max(0,Math.min(totalDist,bo.tgtRD));
+        }
+
+        // 2. Exponential position smoothing (critically-damped feel)
+        const gap=bo.tgtRD-bo.curRD;
+        if(Math.abs(gap)>400){
+            bo.curRD=bo.tgtRD;                       // snap on teleport
+        } else {
+            bo.curRD+=gap*(1-Math.exp(-TK_POS*dt));  // smooth glide
+        }
+
+        // 3. Road position + geometry heading
+        const pt=rdAt(bo.curRD);
+        bo.curLL=[pt.lat,pt.lng];
+        bo.marker.setLatLng(bo.curLL);
+
+        // 4. Heading: follow road geometry when moving, freeze when stopped
+        if(moving){
+            let roadH=pt.b;
+            if(bo.dir<0) roadH=(roadH+180)%360;
+            bo.tgtH=roadH;
+        }
+
+        // 5. Smooth heading via shortest-angle exponential interpolation
+        const hd=sdelta(bo.curH,bo.tgtH);
+        bo.curH=(bo.curH+hd*(1-Math.exp(-TK_HDG*dt))+360)%360;
+
+        // 6. Update model-viewer camera-orbit (throttled >0.8° to save GPU)
+        const ct=headingToTheta(bo.curH);
+        if(Math.abs(sdelta(bo.curTheta,ct))>0.8){
+            bo.curTheta=ct;
+            const mv=document.querySelector('#mv-'+id);
+            if(mv){
+                const phi=is3D?'58deg':'38deg';
+                mv.setAttribute('camera-orbit',ct.toFixed(1)+'deg '+phi+' 102%');
+            }
+        }
+
+        // 7. Heading beam (hidden by CSS, but kept for future use)
+        const bm=document.querySelector('#bm-'+id);
+        if(bm) bm.style.transform='rotate('+bo.curH.toFixed(1)+'deg)';
+    }
+
+    // ===========================================================
+    // GPS INGESTION WITH MAP MATCHING
+    // Sets targets; the tick loop handles all visual movement
+    // ===========================================================
+    function updateBus(id,busName,lat,lng,speed,course,formattedTime,isOnline){
+        if(!map){pending[id]={id,busName,lat,lng,speed,course,formattedTime,isOnline};return;}
+        const bo=buses[id];
+        const lastD=bo?bo.curRD:null,curDir=bo?bo.dir:1;
+        const m=mapMatch(lat,lng,lastD,curDir);
+        let dir=curDir;
+        if(bo&&Math.abs(m.rd-bo.curRD)>3)dir=m.rd>=bo.curRD?1:-1;
+        let rb=m.b;if(dir<0)rb=(rb+180)%360;
+        let effH=(rb+MODEL_HEADING_OFFSET+360)%360;
+        if(bo&&speed!==null&&speed!==undefined&&speed<1.2)effH=bo.curH;
+        if(!bo){
+            createBusMarker(id,busName,m.lat,m.lng,rb,speed,formattedTime,isOnline,m.rd);
+        } else {
+            // Update targets — tick loop smooths everything visually
+            bo.name=busName;bo.isOnline=isOnline;
+            bo.spd=speed||0;bo.spdMps=(speed||0)/3.6;
+            bo.dir=dir;bo.tgtRD=m.rd;bo.tgtH=effH;
+            const bg=document.querySelector('#bg-'+id);if(bg)bg.classList.toggle('offline',!isOnline);
+            bndPop(bo.marker,busName,speed,effH,formattedTime,isOnline);
+        }
+        if(firstLoad){map.setView([m.lat,m.lng],15);firstLoad=false;}
+    }
+
+    function updateBusLocation(lat,lng,speed,course,formattedTime,isOnline){
+        updateBus(1,"حافلة 1 (26/31)",lat,lng,speed,course,formattedTime,isOnline);
+    }
+    function centerBus(id){const b=buses[id];if(b&&b.curLL)map.flyTo(b.curLL,16.5,{duration:1.2,easeLinearity:0.25});}
+    function fitAllBuses(){
+        const pts=Object.values(buses).filter(b=>b.curLL).map(b=>b.curLL);
+        if(pts.length===1)map.flyTo(pts[0],16.5,{duration:1.2});
+        else if(pts.length>1)map.fitBounds(L.latLngBounds(pts),{padding:[60,60],maxZoom:16.5});
+    }
+    function centerOnBus(){centerBus(1);}
+    window.onload=function(){initMap();requestAnimationFrame(mainLoop);};
+    </script>
+</body>
+</html>

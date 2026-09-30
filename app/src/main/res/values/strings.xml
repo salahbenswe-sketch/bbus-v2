@@ -1,0 +1,41 @@
+<resources>
+    <string name="app_name">حافلة بني عطلي</string>
+    <string name="bus_title">حافلة بني عطلي</string>
+    <string name="bus_subtitle">ولاية المدية</string>
+    <string name="author_credit">By Salah Benahmedi</string>
+    <string name="enter_tracker">بدء التتبع</string>
+    <string name="status_connected">متصل</string>
+    <string name="status_disconnected">غير متصل</string>
+    <string name="status_connecting">جاري الاتصال...</string>
+    <string name="status_online">أونلاين</string>
+    <string name="status_offline">أوفلاين</string>
+    <string name="last_update">آخر تحديث</string>
+    <string name="latitude">خط العرض</string>
+    <string name="longitude">خط الطول</string>
+    <string name="speed">السرعة</string>
+    <string name="speed_unit">كم/س</string>
+    <string name="course">الاتجاه</string>
+    <string name="altitude">الارتفاع</string>
+    <string name="altitude_unit">م</string>
+    <string name="status">الحالة</string>
+    <string name="fuel">الوقود</string>
+    <string name="ignition">الإشعال</string>
+    <string name="ignition_on">مفتوح</string>
+    <string name="ignition_off">مغلق</string>
+    <string name="distance_today">المسافة (اليوم)</string>
+    <string name="total_distance">إجمالي المسافة</string>
+    <string name="km_unit">كم</string>
+    <string name="loading_data">جاري تحميل بيانات حافلة بني عطلي...</string>
+    <string name="fetch_error">فشل في جلب البيانات</string>
+    <string name="retry">إعادة المحاولة</string>
+    <string name="center_bus">التركيز على الحافلة</string>
+    <string name="auto_refresh">تحديث تلقائي</string>
+    <string name="refresh_now">تحديث الآن</string>
+    <string name="motion_status">الحركة</string>
+    <string name="moving">متحرك</string>
+    <string name="stopped">متوقف</string>
+    <string name="phone">الهاتف</string>
+    <string name="device_id">معرف الجهاز</string>
+    <string name="unknown">غير متاح</string>
+</resources>
+

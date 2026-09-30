@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "706937947172",
+    "project_id": "bbus-a325c",
+    "storage_bucket": "bbus-a325c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:706937947172:android:9ff07918e7cd9d94fa44b1",
+        "android_client_info": {
+          "package_name": "com.aistudio.bustracker.medea"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAx8AeMqg6o7LipAmz0kEEVXYILeG1Lx7A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
